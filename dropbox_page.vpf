@@ -1,0 +1,15 @@
+<apex:page controller="dropboxStuff">
+
+
+
+
+        <apex:form >
+       <apex:pageMessages />
+         <apex:commandButton value="Login into DROPBOX" action="{!doLogin }" onclick="getRefreshToken" />
+           
+          <apex:commandButton value="Create a folder on DROPBOX" action="{!doFolder}"/>
+       
+        
+  </apex:form> 
+  
+</apex:page>
