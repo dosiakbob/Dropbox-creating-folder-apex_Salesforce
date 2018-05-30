@@ -1,0 +1,142 @@
+public with sharing class dropboxStuff {
+    //hardcode issue make away with CUSTOM SETTINGS
+    private String appKey;
+    private String appSecret;
+    private String redirectURI;
+    private String Dropbox_OAuth_authorize;
+    private String Dropbox_OAuth_token;
+    private String authorizationCode;
+    private String access_token;
+    private String tokenURI_1;
+    private String tokenURI_2;
+    private String create_folder;
+    
+    
+    
+    public String code { get; set; }
+ 
+    public  dropboxStuff() {
+   
+        
+		Dropbox_stuff__c mcs = Dropbox_stuff__c.getvalues('dropbox_auth_data');
+        appKey = mcs.appKey__c;
+		appSecret = mcs.appSecret__c;
+        Dropbox_OAuth_authorize = mcs.Dropbox_OAuth_authorize__c;
+        Dropbox_OAuth_token = mcs.Dropbox_OAuth_token__c;
+        redirectURI = mcs.redirectURI__c;
+      
+        
+        System.debug(appkey+ '   <---appkey');
+     
+
+        code = ApexPages.currentPage().getParameters().get('code');
+        System.debug(code + ' <---one patr of oauth token');
+        
+        
+    }
+    												//AUTHORIZATION
+   public PageReference doLogin() {
+       
+       if(code != null){
+       try{
+        String uri = Dropbox_OAuth_authorize +
+                     '?client_id=' + appKey +
+                     '&response_type=code' +
+                     '&redirect_uri=' + redirectURI;
+       
+        PageReference pr = new PageReference(uri);
+        pr.setRedirect(true);
+       
+        return pr;
+       }catch(Exception e){
+          ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR,'Something gone wrong'));
+			return null;
+           
+       }
+       }else{
+           ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR,'We can\'t authorize, sorry'));
+           return null;
+       }
+   }
+    
+    
+    private void accessToken(){
+        Dropbox_stuff__c mcs = Dropbox_stuff__c.getvalues('dropbox_auth_data');
+        tokenURI_1 = mcs.tokenURI_1__c;
+        tokenURI_2 = mcs.tokenURI_2__c;
+        create_folder = mcs.create_folder__c;
+       									//creating uri with oauth2 token
+        try{
+       String tokenUri = tokenURI_1 + 'grant_type=authorization_code&code='+
+           code+'&redirect_uri=' + tokenURI_2;
+        HttpRequest req = new HttpRequest();
+        req.setMethod('POST');
+        req.setEndpoint(tokenUri);
+        req.setTimeout(60*1000);
+        
+        Blob headerValue = Blob.valueOf(appKey + ':' + appSecret);
+        System.debug(headerValue + '   <----headerVAlue');
+        
+        String authorizationHeader = 'BASIC ' + EncodingUtil.base64Encode(headerValue);
+        req.setHeader('Authorization', authorizationHeader);
+        
+        Http h = new Http();
+        String resp;
+        
+        HttpResponse res = h.send(req);
+        resp = res.getBody();
+        
+        System.debug(resp + '  <--We have response');
+        
+        JSONParser parser = JSON.createParser(resp);
+		while (parser.nextToken() != null) {
+		if ((parser.getCurrentToken() == JSONToken.FIELD_NAME)){
+		String fieldName = parser.getText();
+		parser.nextToken();
+		if(fieldName == 'access_token') {
+		access_token = parser.getText();
+		System.debug(access_token+ '   <---and we have final access token');
+        }
+        }
+            
+		}
+		}catch(Exception e){
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR,'Something gone wrong'));
+}
+        
+}
+    
+    												//creating a folder
+    public void doFolder() {
+       
+       //we get whis token from upside method
+        accessToken();
+ 
+        if(access_token != null){
+        try{
+   		String json = JSON.serialize(new Map <String, String>  {'path' => '/test'});
+        HttpRequest req = new HttpRequest();
+        Http http = new Http();
+        System.debug(json + '   <---JSONobject');
+       
+       
+    	req.setEndpoint(create_folder); 
+     	req.setHeader('authorization', 'Bearer '+ access_token);
+     	req.setHeader('content-Type','application/json');            
+     	req.setHeader('Content-length', string.ValueOf(json.length()));
+     	req.setMethod('POST');
+      	req.setTimeout(60*1000); 
+     	req.setBody(json);
+        
+     	HttpResponse resp = http.send(req);
+       	System.debug(resp + '<-resp');
+        
+        }catch(Exception e){
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR,'Something gone wrong'));
+        }
+        }else{
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR,'PLEASE LOGIN TO DROPBOX FIRST'));
+            
+        }
+}
+}
